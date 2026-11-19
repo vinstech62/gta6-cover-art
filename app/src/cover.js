@@ -1,26 +1,45 @@
 // Vice City Cover Maker: draws a multi-panel GTA-style poster cover.
-// Layout: three photo panels on top (one big hero, two stacked on the
-// right), a sunset caption band along the foot. Every render is
-// deterministic: no Math.random, no Date.now, fixed-seed grain.
+// Three layouts (Classic, Five-panel, Full-bleed) and five colour grades.
+// Every render is deterministic: no Math.random, no Date.now, fixed-seed grain.
 
 /** Colour stops for each grade: [bandTop, bandMid, bandBot, sun, tintTop, tintBot]. */
 export const GRADES = {
   sunset: ['#3b1d5e', '#c2185b', '#ff7a1a', '#ffd23f', 'rgba(255, 45, 149, 0.20)', 'rgba(255, 122, 26, 0.28)'],
   neon: ['#12082e', '#7b2ff7', '#00c2ff', '#ff2e88', 'rgba(123, 47, 247, 0.22)', 'rgba(0, 229, 255, 0.24)'],
   pink: ['#2a0a3d', '#ff2e88', '#ff8fb3', '#fff176', 'rgba(255, 46, 136, 0.22)', 'rgba(255, 143, 179, 0.26)'],
+  golden: ['#3d1c02', '#d97706', '#fbbf24', '#fff7cc', 'rgba(217, 119, 6, 0.22)', 'rgba(251, 191, 36, 0.26)'],
+  teal: ['#031525', '#0e7490', '#2dd4bf', '#a5f3fc', 'rgba(14, 116, 144, 0.24)', 'rgba(45, 212, 191, 0.26)'],
 };
 
-/** Default panels: all three use photo 0, each framed on a different part. */
-export function defaultPanels() {
+export const LAYOUTS = ['classic', 'five', 'fullbleed'];
+
+/** Default panels per layout: photos cycle [0,1,2,0,1], each framed on a different part. */
+export function defaultPanels(layout = 'five') {
+  if (layout === 'classic') {
+    return [
+      { photoIndex: 0, focusX: 0.5, focusY: 0.35, zoom: 1 },
+      { photoIndex: 1, focusX: 0.5, focusY: 0.25, zoom: 1 },
+      { photoIndex: 2, focusX: 0.5, focusY: 0.75, zoom: 1 },
+    ];
+  }
+  if (layout === 'fullbleed') {
+    return [
+      { photoIndex: 0, focusX: 0.5, focusY: 0.35, zoom: 1 },
+      { photoIndex: 1, focusX: 0.2, focusY: 0.5, zoom: 1 },
+      { photoIndex: 2, focusX: 0.8, focusY: 0.5, zoom: 1 },
+    ];
+  }
   return [
     { photoIndex: 0, focusX: 0.5, focusY: 0.35, zoom: 1 },
-    { photoIndex: 0, focusX: 0.5, focusY: 0.15, zoom: 1 },
-    { photoIndex: 0, focusX: 0.5, focusY: 0.75, zoom: 1 },
+    { photoIndex: 1, focusX: 0.5, focusY: 0.25, zoom: 1 },
+    { photoIndex: 2, focusX: 0.5, focusY: 0.75, zoom: 1 },
+    { photoIndex: 0, focusX: 0.2, focusY: 0.3, zoom: 1 },
+    { photoIndex: 1, focusX: 0.8, focusY: 0.3, zoom: 1 },
   ];
 }
 
-/** Panel rectangles for a canvas of W x H, in the order hero, top-right, bottom-right. */
-export function panelRects(W, H) {
+/** Classic layout: hero on the left, two stacked panels on the right. */
+function classicRects(W, H) {
   const captionH = 0.28 * H;
   const panelsH = H - captionH;
   const g = Math.max(8, Math.round(W * 0.012));
@@ -33,6 +52,50 @@ export function panelRects(W, H) {
     { x: rightX, y: g, w: rightW, h: halfH },
     { x: rightX, y: g + halfH + g, w: rightW, h: halfH },
   ];
+}
+
+/** Five-panel layout: big hero left, two small stacked top-right, two small along the bottom. */
+function fiveRects(W, H) {
+  const captionH = 0.28 * H;
+  const panelsH = H - captionH;
+  const g = Math.max(8, Math.round(W * 0.012));
+  const heroW = Math.round((W - 3 * g) * 0.62);
+  const rightX = g + heroW + g;
+  const rightW = W - heroW - 3 * g;
+  const topH = Math.round((panelsH - 3 * g) * 0.62);
+  const smallH = (topH - g) / 2;
+  const botY = g + topH + g;
+  const botH = panelsH - topH - 3 * g;
+  const botW = (W - 3 * g) / 2;
+  return [
+    { x: g, y: g, w: heroW, h: topH },
+    { x: rightX, y: g, w: rightW, h: smallH },
+    { x: rightX, y: g + smallH + g, w: rightW, h: smallH },
+    { x: g, y: botY, w: botW, h: botH },
+    { x: g + botW + g, y: botY, w: botW, h: botH },
+  ];
+}
+
+/** Full-bleed layout: one photo fills the panel area, two small panels inset at the bottom-right corner. */
+function fullbleedRects(W, H) {
+  const captionH = 0.28 * H;
+  const panelsH = H - captionH;
+  const g = Math.max(8, Math.round(W * 0.012));
+  const insetW = Math.round((W - 2 * g) * 0.3);
+  const insetH = Math.round((panelsH - 2 * g) * 0.36);
+  const insetY = g + panelsH - 2 * g - insetH;
+  return [
+    { x: g, y: g, w: W - 2 * g, h: panelsH - 2 * g },
+    { x: W - g - 2 * insetW - g, y: insetY, w: insetW, h: insetH },
+    { x: W - g - insetW, y: insetY, w: insetW, h: insetH },
+  ];
+}
+
+/** Panel rectangles for a canvas of W x H, for the given layout. */
+export function panelRects(W, H, layout = 'five') {
+  if (layout === 'classic') return classicRects(W, H);
+  if (layout === 'fullbleed') return fullbleedRects(W, H);
+  return fiveRects(W, H);
 }
 
 // --- deterministic grain: a 128x128 noise tile from a fixed-seed LCG. ---
@@ -138,17 +201,18 @@ function drawSpacedText(ctx, text, cx, y, spacing) {
  * @param {Array<{photoIndex:number,focusX:number,focusY:number,zoom:number}>} panels
  * @param {string} caption - big title text
  * @param {string} subcaption - small line under the title
- * @param {string} grade - 'sunset' | 'neon' | 'pink'
+ * @param {string} grade - 'sunset' | 'neon' | 'pink' | 'golden' | 'teal'
  * @param {number} selected - index of the panel to highlight, or -1
+ * @param {string} layout - 'classic' | 'five' | 'fullbleed'
  */
-export function drawCover(canvas, photos, panels, caption, subcaption, grade, selected = -1) {
+export function drawCover(canvas, photos, panels, caption, subcaption, grade, selected = -1, layout = 'five') {
   const ctx = canvas.getContext('2d');
   const W = canvas.width;
   const H = canvas.height;
   const [bandTop, bandMid, bandBot, sunColor, tintTop, tintBot] = GRADES[grade] || GRADES.sunset;
   const captionH = 0.28 * H;
   const bandY = H - captionH;
-  const rects = panelRects(W, H);
+  const rects = panelRects(W, H, layout);
 
   // Base.
   ctx.fillStyle = '#14101c';
@@ -156,7 +220,7 @@ export function drawCover(canvas, photos, panels, caption, subcaption, grade, se
 
   // Panels: photo, grade tint, vignette, grain, dark border.
   rects.forEach((rect, i) => {
-    const p = panels[i] || defaultPanels()[i];
+    const p = panels[i] || defaultPanels(layout)[i];
     const photo = photos[p.photoIndex] ?? null;
     drawPanelPhoto(ctx, photo, rect, p.focusX, p.focusY, p.zoom);
     const tint = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
@@ -178,12 +242,12 @@ export function drawCover(canvas, photos, panels, caption, subcaption, grade, se
     ctx.fillStyle = grainPattern(ctx);
     ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
     ctx.globalAlpha = 1;
-    ctx.lineWidth = 4;
+    ctx.lineWidth = layout === 'fullbleed' && i > 0 ? 6 : 4;
     ctx.strokeStyle = i === selected ? '#ff7a1a' : 'rgba(12, 6, 20, 0.95)';
     ctx.strokeRect(rect.x + 2, rect.y + 2, rect.w - 4, rect.h - 4);
   });
 
-  // Caption band: sunset gradient.
+  // Caption band: grade gradient.
   const band = ctx.createLinearGradient(0, bandY, 0, H);
   band.addColorStop(0, bandTop);
   band.addColorStop(0.55, bandMid);

@@ -1,12 +1,19 @@
-// A working gta6-cover-art-01 entry (Node 22, standard library only): the app is this directory's app/ folder, plain
-// static files a desktop browser loads offline (app/index.html and its ES modules, no library and no network
-// request), and the program hands it in. It copies app/ and screenshots/ from beside this file to /output and writes
-// /output/dossier.json, the summary the judge reads, with the vendored make.fun library. Only the plumbing, not the
-// cover art the bounty asks for: Vice City Cover Maker, a multi-panel poster cover — one hero photo plus two
-// stacked panels, a sunset caption band with bold Anton lettering, three post sizes, three colour grades —
-// exported as a PNG. Its two sample photos (app/samples/) were made for make.fun with an image model and
-// are free to use. Build your own GTA-style cover maker in its place, put your 3 or 4 PNG or JPEG screenshots in
-// screenshots/ (the first by name is the cover) and run it.
+// Five-panel Vice City Cover Maker: a working gta6-cover-art-01 entry
+// (Node 22, standard library only). The app is this directory's app/
+// folder, plain static files a desktop browser loads offline
+// (app/index.html and its ES modules, no library and no network request),
+// and the program hands it in. It copies app/ and screenshots/ from
+// beside this file to /output and writes /output/dossier.json, the summary
+// the judge reads, with the vendored make.fun library. Only the plumbing,
+// not the cover art the bounty asks for: Vice City Cover Maker — a
+// five-panel GTA-style poster cover (hero plus two small top panels plus
+// two along the bottom, with Classic and Full-bleed layouts too), a sunset
+// caption band with bold Anton lettering, three post sizes, five colour
+// grades (Sunset, Neon Night, Vice Pink, Golden Hour, Midnight Teal) —
+// exported as a PNG. Its two sample photos (app/samples/) were made for
+// make.fun with an image model and are free to use. Build your own
+// GTA-style cover maker in its place, put your 3 or 4 PNG or JPEG
+// screenshots in screenshots/ (the first by name is the cover) and run it.
 //
 // Serve it locally with `node serve.ts`, then open http://localhost:8080.
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:

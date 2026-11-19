@@ -1,8 +1,8 @@
 // Vice City Cover Maker: wires the editor. Pick up to three photos, caption
-// it, crop each panel by dragging (or the sliders), pick a size and a grade,
-// export the cover as a PNG. A `?shot=` query sets up a fixed scene for a
-// screenshot instead (./shots.js).
-import { drawCover, defaultPanels } from './cover.js';
+// it, crop each panel by dragging (or the sliders), pick a layout, a size and
+// a grade, export the cover as a PNG. A `?shot=` query sets up a fixed scene
+// for a screenshot instead (./shots.js).
+import { drawCover, defaultPanels, panelRects } from './cover.js';
 import { runShot } from './shots.js';
 
 const SIZES = {
@@ -22,9 +22,11 @@ const focusXSlider = document.getElementById('focus-x');
 const focusYSlider = document.getElementById('focus-y');
 const panelLabel = document.getElementById('panel-label');
 const zoomValue = document.getElementById('zoom-value');
+const layoutButtons = [...document.querySelectorAll('[data-layout]')];
 
 const photos = [null, null, null];
-const panels = defaultPanels();
+let layout = 'five';
+let panels = defaultPanels(layout);
 let selected = 0;
 let dragging = false;
 let lastX = 0;
@@ -49,12 +51,15 @@ function redraw() {
     subcaptionInput.value,
     gradeSelect.value,
     selected,
+    layout,
   );
   syncSliders();
 }
 
 function syncSliders() {
-  if (selected < 0) {
+  // Guard: cover screenshots set selected = -1, and a layout switch can
+  // shrink the panel list below the old selection — never index blindly.
+  if (selected < 0 || selected >= panels.length || !panels[selected]) {
     panelLabel.textContent = 'Cover — no panel selected';
     return;
   }
@@ -62,7 +67,7 @@ function syncSliders() {
   zoomSlider.value = String(p.zoom);
   focusXSlider.value = String(Math.round(p.focusX * 100));
   focusYSlider.value = String(Math.round(p.focusY * 100));
-  panelLabel.textContent = `Panel ${selected + 1} of 3 — photo ${p.photoIndex + 1}`;
+  panelLabel.textContent = `Panel ${selected + 1} of ${panels.length} — photo ${p.photoIndex + 1}`;
   zoomValue.textContent = `${p.zoom.toFixed(2)}x`;
 }
 
@@ -77,30 +82,37 @@ function applySize() {
   redraw();
 }
 
-/** Which panel (0-2) holds a point in client pixels, or -1. */
+function setLayout(next) {
+  if (!['classic', 'five', 'fullbleed'].includes(next)) return;
+  layout = next;
+  panels = defaultPanels(layout);
+  selected = 0;
+  for (const btn of layoutButtons) {
+    btn.classList.toggle('active', btn.dataset.layout === layout);
+    btn.setAttribute('aria-pressed', String(btn.dataset.layout === layout));
+  }
+  setStatus(`Layout ${layout === 'five' ? 'Five-panel' : layout === 'classic' ? 'Classic' : 'Full-bleed'} — ${panels.length} panels`);
+  redraw();
+}
+
+/** Which panel holds a point in client pixels, or -1. */
 export function panelAt(clientX, clientY) {
   const r = canvas.getBoundingClientRect();
   const cx = (clientX - r.left) * (canvas.width / r.width);
   const cy = (clientY - r.top) * (canvas.height / r.height);
-  const W = canvas.width;
-  const H = canvas.height;
-  const captionH = 0.28 * H;
-  const panelsH = H - captionH;
-  const g = Math.max(8, Math.round(W * 0.012));
-  const heroW = Math.round((W - 3 * g) * 0.62);
-  const rightX = g + heroW + g;
-  const rightW = W - heroW - 3 * g;
-  const halfH = (panelsH - 3 * g) / 2;
-  const rects = [
-    { x: g, y: g, w: heroW, h: panelsH - 2 * g },
-    { x: rightX, y: g, w: rightW, h: halfH },
-    { x: rightX, y: g + halfH + g, w: rightW, h: halfH },
-  ];
-  for (let i = 0; i < 3; i++) {
+  const rects = panelRects(canvas.width, canvas.height, layout);
+  // Full-bleed insets sit on top of the big panel: check them first.
+  const order = layout === 'fullbleed' ? [1, 2, 0] : rects.map((_, i) => i);
+  for (const i of order) {
     const rc = rects[i];
     if (cx >= rc.x && cx <= rc.x + rc.w && cy >= rc.y && cy <= rc.y + rc.h) return i;
   }
   return -1;
+}
+
+// Layout buttons: Classic (3 panels), Five-panel (5, default), Full-bleed (1 + 2 insets).
+for (const btn of layoutButtons) {
+  btn.addEventListener('click', () => setLayout(btn.dataset.layout));
 }
 
 // Photo inputs: each file goes to its own slot.
@@ -114,6 +126,7 @@ for (let i = 0; i < 3; i++) {
     redraw();
   });
   document.getElementById(`use-photo-${i + 1}`).addEventListener('click', () => {
+    if (selected < 0 || selected >= panels.length) return;
     panels[selected].photoIndex = i;
     setStatus(`Panel ${selected + 1} now uses photo ${i + 1}`);
     redraw();
@@ -128,14 +141,17 @@ sizeSelect.addEventListener('change', () => {
   setStatus(`Size ${sizeSelect.value.replace('x', ' x ')}`);
 });
 zoomSlider.addEventListener('input', () => {
+  if (selected < 0 || selected >= panels.length) return;
   panels[selected].zoom = Number(zoomSlider.value);
   redraw();
 });
 focusXSlider.addEventListener('input', () => {
+  if (selected < 0 || selected >= panels.length) return;
   panels[selected].focusX = Number(focusXSlider.value) / 100;
   redraw();
 });
 focusYSlider.addEventListener('input', () => {
+  if (selected < 0 || selected >= panels.length) return;
   panels[selected].focusY = Number(focusYSlider.value) / 100;
   redraw();
 });
@@ -181,7 +197,7 @@ document.getElementById('export').addEventListener('click', () => {
   const off = document.createElement('canvas');
   off.width = w;
   off.height = h;
-  drawCover(off, photos, panels, captionInput.value, subcaptionInput.value, gradeSelect.value, -1);
+  drawCover(off, photos, panels, captionInput.value, subcaptionInput.value, gradeSelect.value, -1, layout);
   off.toBlob((blob) => {
     if (!blob) {
       setStatus('Export failed — the browser could not make the PNG.');
@@ -200,7 +216,7 @@ document.fonts.load('16px Anton').finally(() => {
   const params = new URLSearchParams(location.search);
   const shot = params.get('shot');
   if (shot) {
-    runShot(shot, params, async (sample, text, size, grade) => {
+    runShot(shot, params, async (sample, text, size, grade, shotLayout) => {
       const img = await loadImage(sample);
       photos[0] = img;
       photos[1] = img;
@@ -209,7 +225,10 @@ document.fonts.load('16px Anton').finally(() => {
       if (shot === 'cover') selected = -1; // cover shots show no editor selection
       if (size && SIZES[size]) sizeSelect.value = size;
       if (grade) gradeSelect.value = grade;
+      if (shotLayout) setLayout(shotLayout);
       applySize();
+      if (shot === 'cover') selected = -1;
+      redraw();
     });
   } else {
     loadImage('samples/pier.jpg').then((img) => {
