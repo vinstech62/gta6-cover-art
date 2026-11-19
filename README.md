@@ -1,17 +1,12 @@
-# gta6-cover-art
+# Vice City Cover Maker
 
-[![make.fun](https://make.fun/badge/gta6-cover-art-01.svg)](https://make.fun/c/gta6-cover-art-01)
-[![rank](https://make.fun/badge/gta6-cover-art-01/vinstech62/gta6-cover-art/rank.svg)](https://make.fun/c/gta6-cover-art-01)
-[![reward](https://make.fun/badge/gta6-cover-art-01/vinstech62/gta6-cover-art/reward.svg)](https://make.fun/c/gta6-cover-art-01)
+[![make.fun](https://make.fun/badge/gta6-cover-art-01.svg)](https://make.fun/bounty/gta6-cover-art-01)
+[![rank](https://make.fun/badge/gta6-cover-art-01/vinstech62/gta6-cover-art/rank.svg)](https://make.fun/bounty/gta6-cover-art-01)
+[![reward](https://make.fun/badge/gta6-cover-art-01/vinstech62/gta6-cover-art/reward.svg)](https://make.fun/bounty/gta6-cover-art-01)
 
-Vice City Cover Maker — an offline web app that turns your photos and a
-caption into GTA 6-style multi-panel cover art: five photo panels by
-default (one big hero, two small panels up top, two along the bottom),
-with Classic (hero + 2) and Full-bleed (one big photo + two inset panels)
-layouts, a sunset caption band with bold lettering, five colour grades
-(Sunset, Neon Night, Vice Pink, Golden Hour, Midnight Teal) and the common
-post sizes 1080 x 1080, 1080 x 1350 and 1920 x 1080. Click a panel to pick
-it, drag a photo to crop it, scroll to zoom, export the cover as a PNG.
+An offline web app that turns your photos and a caption into GTA 6-style multi-panel cover art: five panels, a Vice City sunset caption band with palm silhouettes, five colour grades, and PNG export in the common post sizes 1080x1080, 1080x1350 and 1920x1080. Load up to three photos, pick a panel to crop and position it, choose a layout and a grade, and export.
+
+Built for the [make.fun bounty gta6-cover-art-01](https://make.fun/bounty/gta6-cover-art-01).
 
 ## Run it
 
@@ -19,8 +14,16 @@ it, drag a photo to crop it, scroll to zoom, export the cover as a PNG.
 node serve.ts
 ```
 
-Then open http://localhost:8080 in desktop Chrome. Everything runs
-offline: photos stay on your machine, no network requests.
+Then open http://localhost:8080 in desktop Chrome.
 
-Built for [make.fun](https://make.fun) — bounty
-[`gta6-cover-art-01`](https://make.fun/bounty/gta6-cover-art-01).
+## How it works
+
+- `app/index.html` — the editor page: photo inputs, caption fields, size, layout and grade controls, and the preview canvas.
+- `app/style.css` — the dark editor theme and the cover-only view.
+- `app/src/cover.js` — the painter: three layouts, per-panel crop and zoom, soft-light grades, vignette, deterministic film grain, and the sunset caption band with sun, palms and halftone dots.
+- `app/src/main.js` — the wiring: photo loading, panel picking, drag to move, scroll to zoom, export to PNG.
+- `app/src/shots.js` — screenshot mode from the page query, for the entry's screenshots.
+
+No network is needed: every script, font and sample photo is a file under `app/`, and your photos never leave your machine.
+
+Made for make.fun.
