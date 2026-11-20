@@ -1,9 +1,16 @@
+/* Vice City Cover Maker - editor theme.
+ *
+ * Dark purple studio chrome around the cover canvas; the cover itself
+ * is painted entirely by src/cover.js. In cover mode (used for the
+ * entry screenshots) all chrome hides and the canvas fills the screen.
+ */
+
 @font-face {
-  font-family: "Anton";
-  font-style: normal;
+  font-family: 'Anton';
+  src: url('fonts/Anton-Regular.ttf') format('truetype');
   font-weight: 400;
+  font-style: normal;
   font-display: swap;
-  src: url("fonts/Anton-Regular.ttf") format("truetype");
 }
 
 * {
@@ -17,50 +24,46 @@ body {
 }
 
 body {
-  background: #12081f;
-  color: #f4eefc;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  min-height: 100vh;
-}
-
-#app {
+  background: #170b26;
+  background-image: radial-gradient(1200px 600px at 70% -10%, #3b1163 0%, #170b26 60%);
+  color: #f4ecff;
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
 #topbar {
-  padding: 18px 24px 10px;
-  background: linear-gradient(90deg, #2a0a4a 0%, #4a0e52 55%, #7a1245 100%);
-  border-bottom: 2px solid #ff7a3d;
+  padding: 18px 28px 10px;
 }
 
 #topbar h1 {
   margin: 0;
-  font-family: "Anton", system-ui, sans-serif;
+  font-family: 'Anton', 'Arial Black', sans-serif;
   font-size: 34px;
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: #fff7e6;
-  text-shadow: 0 3px 0 #1a051f, 0 0 22px rgba(255, 122, 61, 0.55);
+  color: #ffffff;
+  text-shadow: 0 3px 0 #db2777, 0 6px 18px rgba(0, 0, 0, 0.55);
 }
 
-#tagline {
-  margin: 4px 0 0;
-  color: #ffd9c2;
-  font-size: 14px;
+#topbar .tagline {
+  margin: 6px 0 0;
+  color: #d8c7f5;
+  font-size: 15px;
 }
 
 #workspace {
   flex: 1;
   display: flex;
-  gap: 20px;
-  padding: 20px 24px 24px;
+  flex-direction: row;
   align-items: flex-start;
+  gap: 24px;
+  padding: 14px 28px 28px;
 }
 
 #previewPane {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -69,161 +72,157 @@ body {
 }
 
 #coverCanvas {
-  max-width: 100%;
-  max-height: calc(100vh - 190px);
-  width: auto;
+  width: min(100%, calc(100vh - 190px));
+  max-width: 900px;
   height: auto;
-  background: #1a0b26;
-  border: 1px solid #5b2a86;
+  background: #12081f;
   border-radius: 6px;
-  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.6);
-  cursor: crosshair;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  cursor: grab;
+  touch-action: none;
+}
+
+#coverCanvas:active {
+  cursor: grabbing;
 }
 
 #hint {
   margin: 0;
-  color: #b9a6d6;
+  color: #b9a5dd;
   font-size: 13px;
-  text-align: center;
 }
 
 #controls {
-  width: 300px;
   flex: 0 0 300px;
-  background: #1d0f2e;
-  border: 1px solid #452a6e;
-  border-radius: 10px;
-  padding: 16px;
+  width: 300px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
+  background: rgba(26, 12, 44, 0.85);
+  border: 1px solid rgba(216, 199, 245, 0.18);
+  border-radius: 10px;
+  padding: 18px;
 }
 
-.controlGroup {
-  border-bottom: 1px solid #3a2358;
-  padding-bottom: 12px;
+#controls .group {
+  border-bottom: 1px solid rgba(216, 199, 245, 0.14);
+  padding-bottom: 14px;
 }
 
-.controlGroup:last-of-type {
+#controls .group:last-of-type {
   border-bottom: none;
+  padding-bottom: 0;
 }
 
-.controlGroup h2 {
-  margin: 0 0 8px;
-  font-size: 12px;
-  letter-spacing: 2px;
+#controls h2 {
+  margin: 0 0 10px;
+  font-family: 'Anton', 'Arial Black', sans-serif;
+  font-size: 15px;
+  letter-spacing: 1.2px;
   text-transform: uppercase;
-  color: #ff9a5c;
+  color: #ffd166;
 }
 
-.controlGroup label {
+.field {
   display: block;
+  margin-bottom: 10px;
   font-size: 13px;
-  color: #d9c9f2;
-  margin-bottom: 8px;
+  color: #d8c7f5;
 }
 
-.controlGroup label:last-child {
+.field:last-child {
   margin-bottom: 0;
 }
 
-.controlGroup input[type="text"],
-.controlGroup select,
-.controlGroup input[type="file"] {
+.field input[type='text'],
+.field select {
   display: block;
   width: 100%;
-  margin-top: 4px;
+  margin-top: 5px;
   padding: 8px 10px;
-  background: #12081f;
-  color: #f4eefc;
-  border: 1px solid #5b2a86;
   border-radius: 6px;
+  border: 1px solid rgba(216, 199, 245, 0.3);
+  background: #241040;
+  color: #ffffff;
   font-size: 14px;
 }
 
-.controlGroup input[type="text"]:focus,
-.controlGroup select:focus {
-  outline: 2px solid #ff7a3d;
-  outline-offset: 1px;
+.field input[type='file'] {
+  display: block;
+  margin-top: 5px;
+  font-size: 13px;
+  color: #d8c7f5;
 }
 
-.controlGroup input[type="range"] {
+.field input[type='range'] {
   display: block;
   width: 100%;
-  margin-top: 4px;
-  accent-color: #ff7a3d;
+  margin-top: 5px;
+  accent-color: #db2777;
 }
 
-.fileLabel input[type="file"] {
-  padding: 6px;
-  font-size: 12px;
-}
-
-#layoutRow {
+.btnRow {
   display: flex;
   gap: 8px;
+  margin-top: 5px;
 }
 
 .layout-btn {
   flex: 1;
-  padding: 9px 4px;
-  background: #2a1544;
-  color: #e8dcfb;
-  border: 1px solid #5b2a86;
+  padding: 8px 4px;
   border-radius: 6px;
+  border: 1px solid rgba(216, 199, 245, 0.3);
+  background: #241040;
+  color: #d8c7f5;
   font-size: 13px;
   cursor: pointer;
 }
 
 .layout-btn:hover {
-  border-color: #ff7a3d;
+  border-color: #db2777;
+  color: #ffffff;
 }
 
 .layout-btn.active {
-  background: #5b1a63;
-  border-color: #ff7a3d;
+  background: #7e22ce;
+  border-color: #a855f7;
   color: #ffffff;
-  font-weight: 700;
 }
 
 #selectedPanel {
-  margin: 0 0 8px;
-  font-size: 13px;
-  color: #ffd9c2;
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: #ffffff;
 }
 
 #exportBtn {
-  padding: 13px 16px;
+  padding: 13px;
   border: none;
   border-radius: 8px;
-  background: linear-gradient(90deg, #ff7a3d 0%, #ff2e88 60%, #c026d3 100%);
+  background: linear-gradient(90deg, #db2777, #f97316);
   color: #ffffff;
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: 1px;
+  font-family: 'Anton', 'Arial Black', sans-serif;
+  font-size: 17px;
+  letter-spacing: 1.2px;
   text-transform: uppercase;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgba(255, 46, 136, 0.45);
+  box-shadow: 0 8px 22px rgba(219, 39, 119, 0.35);
 }
 
 #exportBtn:hover {
-  filter: brightness(1.12);
-}
-
-#exportBtn:active {
-  transform: translateY(1px);
+  filter: brightness(1.1);
 }
 
 #statusLine {
   margin: 0;
-  font-size: 13px;
-  color: #b9a6d6;
   min-height: 18px;
+  font-size: 13px;
+  color: #ffd166;
 }
 
-/* Cover mode: the app draws the cover alone, controls hidden. */
+/* Cover mode: nothing but the cover, filling the viewport. */
 body.cover-mode {
-  background: #000000;
+  background: #12081f;
 }
 
 body.cover-mode #topbar,
@@ -238,27 +237,31 @@ body.cover-mode #workspace {
 }
 
 body.cover-mode #previewPane {
-  width: 100vw;
-  height: 100vh;
+  gap: 0;
 }
 
 body.cover-mode #coverCanvas {
   width: 100vw;
-  height: 100vh;
   max-width: none;
-  max-height: none;
-  border: none;
+  height: 100vh;
   border-radius: 0;
   box-shadow: none;
+  object-fit: contain;
+  background: #12081f;
+  cursor: default;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   #workspace {
     flex-direction: column;
   }
 
   #controls {
+    flex: none;
     width: 100%;
-    flex-basis: auto;
+  }
+
+  #coverCanvas {
+    width: 100%;
   }
 }

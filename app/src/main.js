@@ -1,40 +1,38 @@
-/* Vice City Cover Maker: page wiring.
+/* Vice City Cover Maker - editor wiring.
  *
- * Loads the user's photos, keeps five panels (photos 0, 1, 2, 0, 1, each
- * with its own focus point), and redraws the cover whenever anything
- * changes. Click a panel to select it, drag it to move its photo, scroll
- * over it to zoom. Export renders the cover offscreen at full size and
- * downloads it as a PNG.
+ * Owns the app state (three photo slots, five panel specs, layout,
+ * grade, post size, captions), binds every control on the page, and
+ * handles pointer editing on the preview canvas: click to select a
+ * panel, drag to move its photo, scroll to zoom it. Export renders the
+ * cover offscreen at full size and downloads it as a PNG.
+ *
+ * Classic script; exposes window.ViceCityApp for the screenshot helper.
  */
-
 (function () {
   'use strict';
 
-  var SAMPLE_PHOTO = 'samples/pier.jpg';
+  var PHOTO_ORDER = [0, 1, 2, 0, 1];
+  var DEFAULT_ZOOM = 1.1;
 
-  /* Focus points for the five panels when one photo fills them all:
-   * centre, top, bottom, left, right. */
-  var SINGLE_PHOTO_FOCUS = [
-    { fx: 0.5, fy: 0.5 },
-    { fx: 0.5, fy: 0.18 },
-    { fx: 0.5, fy: 0.82 },
-    { fx: 0.16, fy: 0.5 },
-    { fx: 0.84, fy: 0.5 }
+  /* Focus presets when a single photo fills every panel: spread the
+   * crops around so the panels do not all show the same spot. The hero
+   * panel sits a little high, where faces usually are in a portrait. */
+  var SINGLE_FOCUS = [
+    { fx: 0.5, fy: 0.36 },
+    { fx: 0.5, fy: 0.2 },
+    { fx: 0.5, fy: 0.8 },
+    { fx: 0.2, fy: 0.45 },
+    { fx: 0.8, fy: 0.45 }
   ];
 
-  var MULTI_PHOTO_FOCUS = [
-    { fx: 0.5, fy: 0.3 },
+  /* Focus presets when several photos are in play. */
+  var MULTI_FOCUS = [
+    { fx: 0.5, fy: 0.38 },
     { fx: 0.5, fy: 0.3 },
     { fx: 0.5, fy: 0.62 },
-    { fx: 0.32, fy: 0.5 },
-    { fx: 0.68, fy: 0.5 }
+    { fx: 0.36, fy: 0.5 },
+    { fx: 0.64, fy: 0.5 }
   ];
-
-  var SIZES = {
-    '1080x1080': { w: 1080, h: 1080 },
-    '1080x1350': { w: 1080, h: 1350 },
-    '1920x1080': { w: 1920, h: 1080 }
-  };
 
   var state = {
     photos: [null, null, null],
@@ -44,83 +42,103 @@
     grade: 'sunset',
     size: '1080x1080',
     caption: 'VICE CITY',
-    subCaption: 'SUNSET HEIST',
-    dragging: false,
-    dragMoved: false,
-    lastX: 0,
-    lastY: 0
+    subCaption: 'SUNSET HEIST'
   };
 
-  var canvas;
-  var zoomSlider;
-  var focusXSlider;
-  var focusYSlider;
-  var selectedLabel;
-  var statusLine;
+  var els = {};
+  var booted = false;
+  var drag = null;
 
-  function el(id) {
+  function byId(id) {
     return document.getElementById(id);
   }
 
-  function buildPanels() {
-    var focus = state.photos.filter(function (p) { return !!p; }).length <= 1
-      ? SINGLE_PHOTO_FOCUS
-      : MULTI_PHOTO_FOCUS;
-    var order = [0, 1, 2, 0, 1];
-    state.panels = order.map(function (photoIndex, i) {
-      return {
-        photo: photoIndex,
-        fx: focus[i].fx,
-        fy: focus[i].fy,
-        zoom: 1.1
-      };
-    });
+  function clamp(value, lo, hi) {
+    return value < lo ? lo : (value > hi ? hi : value);
   }
 
-  function redraw() {
-    if (!canvas) return;
-    drawCover(canvas, state.photos, state.panels, state.caption, state.subCaption, state.grade, state.layout);
+  function setStatus(message) {
+    if (els.statusLine) els.statusLine.textContent = message;
+  }
+
+  function distinctPhotoCount() {
+    var seen = [];
+    for (var i = 0; i < state.photos.length; i++) {
+      var p = state.photos[i];
+      if (p && seen.indexOf(p) === -1) seen.push(p);
+    }
+    return seen.length;
+  }
+
+  function buildPanels() {
+    var presets = distinctPhotoCount() <= 1 ? SINGLE_FOCUS : MULTI_FOCUS;
+    state.panels = PHOTO_ORDER.map(function (photoIndex, i) {
+      var f = presets[i % presets.length];
+      return { photo: photoIndex, fx: f.fx, fy: f.fy, zoom: DEFAULT_ZOOM };
+    });
+    if (state.selected >= state.panels.length) state.selected = 0;
+  }
+
+  function layoutPanelCount() {
+    if (!els.canvas || !window.computeLayout) return state.panels.length;
+    var layout = window.computeLayout(els.canvas.width, els.canvas.height, state.layout);
+    return layout.panels.length;
+  }
+
+  function updatePanelLabel() {
+    if (!els.selectedPanel) return;
+    els.selectedPanel.textContent =
+      'Panel ' + (state.selected + 1) + ' of ' + layoutPanelCount();
   }
 
   function syncSliders() {
     var panel = state.panels[state.selected];
     if (!panel) return;
-    zoomSlider.value = String(panel.zoom);
-    focusXSlider.value = String(panel.fx);
-    focusYSlider.value = String(panel.fy);
-    selectedLabel.textContent = 'Panel ' + (state.selected + 1) + ' of ' + state.panels.length;
+    if (els.zoomSlider) els.zoomSlider.value = String(panel.zoom);
+    if (els.focusXSlider) els.focusXSlider.value = String(panel.fx);
+    if (els.focusYSlider) els.focusYSlider.value = String(panel.fy);
+    updatePanelLabel();
   }
 
-  function setStatus(message) {
-    if (statusLine) statusLine.textContent = message;
+  function redraw() {
+    if (!els.canvas || !window.drawCover) return;
+    window.drawCover(
+      els.canvas,
+      state.photos,
+      state.panels,
+      state.caption,
+      state.subCaption,
+      state.grade,
+      state.layout
+    );
+    updatePanelLabel();
   }
 
-  function panelAt(clientX, clientY) {
-    var rect = canvas.getBoundingClientRect();
-    var x = (clientX - rect.left) * (canvas.width / rect.width);
-    var y = (clientY - rect.top) * (canvas.height / rect.height);
-    var layout = computeLayout(canvas.width, canvas.height, state.layout);
-    for (var i = layout.panels.length - 1; i >= 0; i--) {
-      var p = layout.panels[i];
-      if (x >= p.x && x <= p.x + p.w && y >= p.y && y <= p.y + p.h) return i;
-    }
-    return -1;
+  function applySize() {
+    if (!els.canvas) return;
+    var parts = String(state.size).split('x');
+    var w = parseInt(parts[0], 10) || 1080;
+    var h = parseInt(parts[1], 10) || 1080;
+    els.canvas.width = w;
+    els.canvas.height = h;
+    redraw();
   }
 
-  function loadPhotoFile(file, index) {
-    if (!file) return;
-    var url = URL.createObjectURL(file);
+  /* ---- photo loading ------------------------------------------------ */
+
+  function loadPhotoIntoSlot(index, src, doneMessage) {
     var img = new Image();
     img.onload = function () {
       state.photos[index] = img;
       buildPanels();
+      syncSliders();
       redraw();
-      setStatus('Photo ' + (index + 1) + ' loaded.');
+      if (doneMessage) setStatus(doneMessage);
     };
     img.onerror = function () {
-      setStatus('Could not read that photo file.');
+      setStatus('That photo could not be loaded.');
     };
-    img.src = url;
+    img.src = src;
   }
 
   function loadSamplePhoto() {
@@ -128,192 +146,277 @@
     img.onload = function () {
       state.photos = [img, img, img];
       buildPanels();
+      syncSliders();
       redraw();
-      setStatus('Sample photo loaded. Add your own photos to make it yours.');
+      setStatus('Sample photo loaded. Add your own photos, pick a panel, then export.');
     };
     img.onerror = function () {
       buildPanels();
+      syncSliders();
       redraw();
-      setStatus('Sample photo missing. Load a photo to begin.');
+      setStatus('The sample photo is missing. Please choose a photo to begin.');
     };
-    img.src = SAMPLE_PHOTO;
+    img.src = 'samples/pier.jpg';
   }
 
-  function applySize() {
-    var size = SIZES[state.size] || SIZES['1080x1080'];
-    canvas.width = size.w;
-    canvas.height = size.h;
+  /* ---- pointer editing ---------------------------------------------- */
+
+  function canvasPoint(evt) {
+    var rect = els.canvas.getBoundingClientRect();
+    return {
+      x: (evt.clientX - rect.left) * (els.canvas.width / rect.width),
+      y: (evt.clientY - rect.top) * (els.canvas.height / rect.height)
+    };
+  }
+
+  function panelIndexAt(point) {
+    var layout = window.computeLayout(els.canvas.width, els.canvas.height, state.layout);
+    for (var i = layout.panels.length - 1; i >= 0; i--) {
+      var p = layout.panels[i];
+      if (point.x >= p.x && point.x <= p.x + p.w && point.y >= p.y && point.y <= p.y + p.h) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  function selectPanel(index) {
+    var count = layoutPanelCount();
+    if (index < 0 || index >= count) return;
+    state.selected = index;
+    syncSliders();
     redraw();
   }
 
-  function exportPng() {
-    var size = SIZES[state.size] || SIZES['1080x1080'];
-    var offscreen = document.createElement('canvas');
-    offscreen.width = size.w;
-    offscreen.height = size.h;
-    drawCover(offscreen, state.photos, state.panels, state.caption, state.subCaption, state.grade, state.layout);
-    setStatus('Exporting PNG…');
-    offscreen.toBlob(function (blob) {
-      if (!blob) {
-        setStatus('Export failed: the browser could not make the PNG.');
-        return;
-      }
-      var url = URL.createObjectURL(blob);
-      var link = document.createElement('a');
-      link.href = url;
-      link.download = 'vice-city-cover-' + size.w + 'x' + size.h + '.png';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
-      setStatus('Exported vice-city-cover-' + size.w + 'x' + size.h + '.png (' + Math.round(blob.size / 1024) + ' KB).');
-    }, 'image/png');
+  function onPointerDown(evt) {
+    var point = canvasPoint(evt);
+    var index = panelIndexAt(point);
+    if (index === -1) return;
+    selectPanel(index);
+    drag = { x: point.x, y: point.y, index: index };
+    if (els.canvas.setPointerCapture) {
+      try { els.canvas.setPointerCapture(evt.pointerId); } catch (err) { /* noop */ }
+    }
+    evt.preventDefault();
   }
 
-  function bindControls() {
-    ['photo1', 'photo2', 'photo3'].forEach(function (id, index) {
-      el(id).addEventListener('change', function (event) {
-        var file = event.target.files && event.target.files[0];
-        if (file) loadPhotoFile(file, index);
-      });
-    });
+  function onPointerMove(evt) {
+    if (!drag) return;
+    var point = canvasPoint(evt);
+    var dx = point.x - drag.x;
+    var dy = point.y - drag.y;
+    drag.x = point.x;
+    drag.y = point.y;
 
-    el('captionInput').addEventListener('input', function (event) {
-      state.caption = event.target.value || 'VICE CITY';
+    var panel = state.panels[drag.index];
+    if (!panel) return;
+    var layout = window.computeLayout(els.canvas.width, els.canvas.height, state.layout);
+    var rect = layout.panels[drag.index];
+    var img = state.photos[panel.photo];
+    if (img && img.naturalWidth && img.naturalHeight && rect) {
+      var scale = Math.max(rect.w / img.naturalWidth, rect.h / img.naturalHeight) *
+        clamp(panel.zoom || 1, 1, 3);
+      panel.fx = clamp(panel.fx - dx / (img.naturalWidth * scale), 0, 1);
+      panel.fy = clamp(panel.fy - dy / (img.naturalHeight * scale), 0, 1);
+    } else if (rect) {
+      panel.fx = clamp(panel.fx - dx / rect.w, 0, 1);
+      panel.fy = clamp(panel.fy - dy / rect.h, 0, 1);
+    }
+    syncSliders();
+    redraw();
+  }
+
+  function onPointerUp() {
+    drag = null;
+  }
+
+  function onWheel(evt) {
+    evt.preventDefault();
+    var point = canvasPoint(evt);
+    var index = panelIndexAt(point);
+    if (index !== -1 && index !== state.selected) selectPanel(index);
+    var panel = state.panels[state.selected];
+    if (!panel) return;
+    var step = evt.deltaY < 0 ? 0.1 : -0.1;
+    panel.zoom = clamp(Math.round((panel.zoom + step) * 100) / 100, 1, 3);
+    syncSliders();
+    redraw();
+  }
+
+  /* ---- export -------------------------------------------------------- */
+
+  function triggerDownload(url, w, h) {
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'vice-city-cover-' + w + 'x' + h + '.png';
+    document.body.appendChild(a);
+    a.click();
+    if (a.remove) a.remove();
+  }
+
+  function exportPng() {
+    var parts = String(state.size).split('x');
+    var w = parseInt(parts[0], 10) || 1080;
+    var h = parseInt(parts[1], 10) || 1080;
+    setStatus('Rendering ' + w + ' x ' + h + ' PNG...');
+
+    var off = document.createElement('canvas');
+    off.width = w;
+    off.height = h;
+    window.drawCover(off, state.photos, state.panels, state.caption, state.subCaption, state.grade, state.layout);
+
+    if (typeof off.toBlob === 'function') {
+      off.toBlob(function (blob) {
+        if (!blob) {
+          setStatus('Export failed in this browser.');
+          return;
+        }
+        var url = URL.createObjectURL(blob);
+        triggerDownload(url, w, h);
+        setStatus('Exported vice-city-cover-' + w + 'x' + h + '.png (' +
+          Math.round(blob.size / 1024) + ' KB).');
+        window.setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      }, 'image/png');
+    } else {
+      triggerDownload(off.toDataURL('image/png'), w, h);
+      setStatus('Exported vice-city-cover-' + w + 'x' + h + '.png.');
+    }
+  }
+
+  /* ---- control bindings ---------------------------------------------- */
+
+  function bindFileInput(id, index) {
+    var input = byId(id);
+    if (!input) return;
+    input.addEventListener('change', function () {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      var url = URL.createObjectURL(file);
+      loadPhotoIntoSlot(index, url, 'Photo ' + (index + 1) + ' loaded.');
+    });
+  }
+
+  function bindEvents() {
+    bindFileInput('photo1', 0);
+    bindFileInput('photo2', 1);
+    bindFileInput('photo3', 2);
+
+    els.captionInput.addEventListener('input', function () {
+      var value = els.captionInput.value;
+      state.caption = value.trim() === '' ? 'VICE CITY' : value;
       redraw();
     });
 
-    el('subCaptionInput').addEventListener('input', function (event) {
-      state.subCaption = event.target.value || '';
+    els.subCaptionInput.addEventListener('input', function () {
+      state.subCaption = els.subCaptionInput.value;
       redraw();
     });
 
-    el('sizeSelect').addEventListener('change', function (event) {
-      state.size = event.target.value;
+    els.sizeSelect.addEventListener('change', function () {
+      state.size = els.sizeSelect.value;
       applySize();
-      setStatus('Size set to ' + state.size.replace('x', ' x ') + '.');
+      setStatus('Post size set to ' + state.size.replace('x', ' x ') + '.');
     });
 
-    var layoutButtons = document.querySelectorAll('.layout-btn');
-    layoutButtons.forEach(function (button) {
+    var buttons = document.querySelectorAll('.layout-btn');
+    Array.prototype.forEach.call(buttons, function (button) {
       button.addEventListener('click', function () {
-        layoutButtons.forEach(function (b) { b.classList.remove('active'); });
-        button.classList.add('active');
-        state.layout = button.getAttribute('data-layout');
+        state.layout = button.getAttribute('data-layout') || 'five-panel';
+        Array.prototype.forEach.call(buttons, function (b) {
+          if (b === button) b.classList.add('active');
+          else b.classList.remove('active');
+        });
+        var count = layoutPanelCount();
+        if (state.selected >= count) state.selected = 0;
+        syncSliders();
         redraw();
         setStatus('Layout: ' + button.textContent + '.');
       });
     });
 
-    el('gradeSelect').addEventListener('change', function (event) {
-      state.grade = event.target.value;
+    els.gradeSelect.addEventListener('change', function () {
+      state.grade = els.gradeSelect.value;
       redraw();
-      setStatus('Grade: ' + event.target.selectedOptions[0].textContent + '.');
+      var label = els.gradeSelect.options[els.gradeSelect.selectedIndex];
+      setStatus('Colour grade: ' + (label ? label.text : state.grade) + '.');
     });
 
-    zoomSlider.addEventListener('input', function (event) {
+    els.zoomSlider.addEventListener('input', function () {
       var panel = state.panels[state.selected];
       if (!panel) return;
-      panel.zoom = parseFloat(event.target.value) || 1;
+      panel.zoom = clamp(parseFloat(els.zoomSlider.value) || 1, 1, 3);
       redraw();
     });
 
-    focusXSlider.addEventListener('input', function (event) {
+    els.focusXSlider.addEventListener('input', function () {
       var panel = state.panels[state.selected];
       if (!panel) return;
-      panel.fx = parseFloat(event.target.value) || 0.5;
+      panel.fx = clamp(parseFloat(els.focusXSlider.value) || 0, 0, 1);
       redraw();
     });
 
-    focusYSlider.addEventListener('input', function (event) {
+    els.focusYSlider.addEventListener('input', function () {
       var panel = state.panels[state.selected];
       if (!panel) return;
-      panel.fy = parseFloat(event.target.value) || 0.5;
+      panel.fy = clamp(parseFloat(els.focusYSlider.value) || 0, 0, 1);
       redraw();
     });
 
-    el('exportBtn').addEventListener('click', exportPng);
+    els.exportBtn.addEventListener('click', exportPng);
 
-    canvas.addEventListener('mousedown', function (event) {
-      var hit = panelAt(event.clientX, event.clientY);
-      if (hit < 0) return;
-      state.selected = hit;
-      state.dragging = true;
-      state.dragMoved = false;
-      state.lastX = event.clientX;
-      state.lastY = event.clientY;
-      syncSliders();
-    });
-
-    canvas.addEventListener('mousemove', function (event) {
-      if (!state.dragging) return;
-      var panel = state.panels[state.selected];
-      if (!panel) return;
-      var rect = canvas.getBoundingClientRect();
-      var dx = (event.clientX - state.lastX) * (canvas.width / rect.width);
-      var dy = (event.clientY - state.lastY) * (canvas.height / rect.height);
-      var layout = computeLayout(canvas.width, canvas.height, state.layout);
-      var slot = layout.panels[state.selected];
-      if (slot) {
-        panel.fx = Math.min(1, Math.max(0, panel.fx - dx / slot.w));
-        panel.fy = Math.min(1, Math.max(0, panel.fy - dy / slot.h));
-      }
-      if (Math.abs(event.clientX - state.lastX) + Math.abs(event.clientY - state.lastY) > 2) {
-        state.dragMoved = true;
-      }
-      state.lastX = event.clientX;
-      state.lastY = event.clientY;
-      syncSliders();
-      redraw();
-    });
-
-    window.addEventListener('mouseup', function () {
-      state.dragging = false;
-    });
-
-    canvas.addEventListener('wheel', function (event) {
-      event.preventDefault();
-      var panel = state.panels[state.selected];
-      if (!panel) return;
-      var step = event.deltaY < 0 ? 0.1 : -0.1;
-      panel.zoom = Math.min(3, Math.max(1, panel.zoom + step));
-      syncSliders();
-      redraw();
-    }, { passive: false });
+    els.canvas.addEventListener('pointerdown', onPointerDown);
+    els.canvas.addEventListener('pointermove', onPointerMove);
+    els.canvas.addEventListener('pointerup', onPointerUp);
+    els.canvas.addEventListener('pointercancel', onPointerUp);
+    els.canvas.addEventListener('wheel', onWheel, { passive: false });
   }
+
+  /* ---- boot ------------------------------------------------------------ */
 
   function init() {
-    canvas = el('coverCanvas');
-    zoomSlider = el('zoomSlider');
-    focusXSlider = el('focusXSlider');
-    focusYSlider = el('focusYSlider');
-    selectedLabel = el('selectedPanel');
-    statusLine = el('statusLine');
+    els = {
+      canvas: byId('coverCanvas'),
+      captionInput: byId('captionInput'),
+      subCaptionInput: byId('subCaptionInput'),
+      sizeSelect: byId('sizeSelect'),
+      gradeSelect: byId('gradeSelect'),
+      selectedPanel: byId('selectedPanel'),
+      zoomSlider: byId('zoomSlider'),
+      focusXSlider: byId('focusXSlider'),
+      focusYSlider: byId('focusYSlider'),
+      exportBtn: byId('exportBtn'),
+      statusLine: byId('statusLine')
+    };
+
+    state.caption = els.captionInput.value || 'VICE CITY';
+    state.subCaption = els.subCaptionInput.value || '';
+
     buildPanels();
-    bindControls();
+    bindEvents();
     applySize();
     syncSliders();
+    booted = true;
     loadSamplePhoto();
-    if (document.fonts && document.fonts.load) {
-      document.fonts.load('40px "Anton"').then(function () {
-        redraw();
-      }).catch(function () {
-        redraw();
-      });
+
+    if (document.fonts && typeof document.fonts.load === 'function') {
+      document.fonts.load('32px Anton').then(function () { redraw(); }, function () { /* noop */ });
+      if (document.fonts.ready) {
+        document.fonts.ready.then(function () { redraw(); }, function () { /* noop */ });
+      }
     }
   }
+
+  window.ViceCityApp = {
+    state: state,
+    redraw: redraw,
+    applySize: applySize,
+    setStatus: setStatus,
+    isBooted: function () { return booted; }
+  };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
-
-  /* Shared state for the screenshot helper (shots.js). */
-  window.ViceCityApp = {
-    state: state,
-    redraw: redraw,
-    applySize: applySize,
-    setStatus: setStatus
-  };
 })();
